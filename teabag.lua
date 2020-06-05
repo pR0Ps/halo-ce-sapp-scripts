@@ -91,12 +91,12 @@ local TEABAG_SQUARED_DIST = (TEABAG_RADIUS/3)^2
 function OnScriptLoad()
     object_table = read_dword(read_dword(sig_scan("8B0D????????8B513425FFFF00008D") + 2))
 
-    register_callback(cb['EVENT_TICK'], "OnTick")
-    register_callback(cb['EVENT_DIE'], "OnPlayerDie")
     register_callback(cb['EVENT_GAME_START'], "OnGameStart")
-    register_callback(cb['EVENT_LEAVE'], "OnPlayerLeave")
-    if PREVENT_SCORE_ON_KILL then
-        register_callback(cb['EVENT_DAMAGE_APPLICATION'], "OnDamageApplication")
+    register_callback(cb['EVENT_GAME_END'], "OnGameEnd")
+
+    if (get_var(0, '$gt') ~= "") then
+        -- Game has already started
+        OnGameStart()
     end
 end
 
@@ -110,6 +110,22 @@ function OnGameStart()
     num_bodies = 0
     bodies = {}
     scores = {}
+
+    register_callback(cb['EVENT_TICK'], "OnTick")
+    register_callback(cb['EVENT_DIE'], "OnPlayerDie")
+    register_callback(cb['EVENT_LEAVE'], "OnPlayerLeave")
+    if PREVENT_SCORE_ON_KILL then
+        register_callback(cb['EVENT_DAMAGE_APPLICATION'], "OnDamageApplication")
+    end
+end
+
+function OnGameEnd()
+    unregister_callback(cb['EVENT_TICK'])
+    unregister_callback(cb['EVENT_DIE'])
+    unregister_callback(cb["EVENT_LEAVE"])
+    if PREVENT_SCORE_ON_KILL then
+        unregister_callback(cb['EVENT_DAMAGE_APPLICATION'])
+    end
 end
 
 
