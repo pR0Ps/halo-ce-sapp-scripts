@@ -56,6 +56,7 @@ api_version = "1.12.0.0"
 
 local loaded_configs = {}
 
+
 -- Normalize a table to either nil (nil/empty) or a list of values (1 or more values)
 function makelist(tbl)
     if tbl == nil then
@@ -92,18 +93,19 @@ function makeset(tbl)
 end
 
 
+-- Modify CONFIG in-place to make accessing the data easier
+for i=#CONFIG, 1, -1 do
+    CONFIG[i].modes = makeset(CONFIG[i].modes)
+    CONFIG[i].maps = makeset(CONFIG[i].maps)
+    CONFIG[i].announce = makelist(CONFIG[i].announce)
+    CONFIG[i].scripts = makelist(CONFIG[i].scripts)
+end
+
+
 function OnScriptLoad()
     register_callback(cb["EVENT_GAME_START"], "OnGameStart")
     register_callback(cb["EVENT_GAME_END"], "OnGameEnd")
     register_callback(cb["EVENT_JOIN"], "OnPlayerJoin")
-
-    -- Optimize access to data
-    for i=#CONFIG, 1, -1 do
-        CONFIG[i].modes = makeset(CONFIG[i].modes)
-        CONFIG[i].maps = makeset(CONFIG[i].maps)
-        CONFIG[i].announce = makelist(CONFIG[i].announce)
-        CONFIG[i].scripts = makelist(CONFIG[i].scripts)
-    end
 
     if (get_var(0, "$gt") ~= "") then
         -- Game has already started
@@ -168,4 +170,5 @@ function OnGameEnd()
             end
         end
     end
+    loaded_configs = {}
 end
