@@ -375,8 +375,6 @@ function add_kill(player_index)
     else
         player_data[player_index].kills = kills
     end
-
-    set_score(player_index)
 end
 
 
@@ -424,18 +422,19 @@ function OnPlayerDie(player_index, killer_index)
     if DATA.melee_tags[last_dmg] ~= nil then
         -- Melee kill - victim level down
         change_level(player_index, -1)
-        return
-    end
-
-    -- Verify the correct weapon was used
-    -- The prevents multi-kills from skipping levels
-    local weapon_used = DATA.damage_map[last_dmg]
-    if weapon_used == nil then
-        cprint("WARNING: Unknown weapon caused damage - script needs updating", 4)
-    elseif CONFIG.levels[player_data[killer_index].level].weapon == weapon_used then
-        -- Note the kill for the killer
         add_kill(killer_index)
+    else
+        -- Verify the correct weapon was used
+        -- The prevents multi-kills from skipping levels
+        local weapon_used = DATA.damage_map[last_dmg]
+        if weapon_used == nil then
+            cprint("WARNING: Unknown weapon caused damage - script needs updating", 4)
+        elseif CONFIG.levels[player_data[killer_index].level].weapon == weapon_used then
+            -- Note the kill for the killer
+            add_kill(killer_index)
+        end
     end
+    set_score(killer_index)
 end
 
 
