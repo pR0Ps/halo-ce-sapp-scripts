@@ -136,6 +136,28 @@ function GenerateReferenceData()
             ["weapons\\sniper rifle\\sniper bullet"] = "sniper rifle",
         }),
 
+        -- Weapon tags (spawning these will be blocked)
+        weapon_tags = union(
+            tagset("weap", {
+                "weapons\\assault rifle\\assault rifle",
+                "weapons\\ball\\ball",
+                "weapons\\flag\\flag",
+                "weapons\\flamethrower\\flamethrower",
+                "weapons\\needler\\mp_needler",
+                "weapons\\pistol\\pistol",
+                "weapons\\plasma_cannon\\plasma_cannon",
+                "weapons\\plasma pistol\\plasma pistol",
+                "weapons\\plasma rifle\\plasma rifle",
+                "weapons\\rocket launcher\\rocket launcher",
+                "weapons\\shotgun\\shotgun",
+                "weapons\\sniper rifle\\sniper rifle",
+            }),
+            tagset("eqip", {
+                "weapons\\frag grenade\\frag grenade",
+                "weapons\\plasma grenade\\plasma grenade",
+            })
+        ),
+
         -- These damage tags are considered melee damage
         melee_tags = tagset("jpt!", {
             "weapons\\assault rifle\\melee",
@@ -163,7 +185,6 @@ end
 
 
 function OnScriptLoad()
-
     register_callback(cb["EVENT_GAME_START"], "OnGameStart")
     register_callback(cb["EVENT_GAME_END"], "OnGameEnd")
 
@@ -196,6 +217,7 @@ function OnGameStart()
     register_callback(cb['EVENT_DIE'], 'OnPlayerDie')
     register_callback(cb['EVENT_DAMAGE_APPLICATION'], "OnDamageApplication")
     register_callback(cb['EVENT_WEAPON_DROP'], "OnWeaponDrop")
+    register_callback(cb['EVENT_OBJECT_SPAWN'], "OnObjectSpawn")
 
     -- Disable vehicles, weapons, and grenades
     execute_command("disable_all_vehicles 0 1")
@@ -216,6 +238,12 @@ function OnGameStart()
     end
 end
 
+function OnObjectSpawn(player_index, tag_id, parent_id, new_obj_id, sapp_spawned)
+    -- block weapons spawned by the server (unless it was from a script)
+    if sapp_spawned == 0 and player_index == 0 and DATA.weapon_tags[tag_id] ~= nil then
+        return false
+    end
+end
 
 function OnGameEnd()
     -- Re-enable everything we disabled
@@ -231,6 +259,7 @@ function OnGameEnd()
     unregister_callback(cb['EVENT_DIE'])
     unregister_callback(cb['EVENT_DAMAGE_APPLICATION'])
     unregister_callback(cb['EVENT_WEAPON_DROP'])
+    unregister_callback(cb['EVENT_OBJECT_SPAWN'])
 end
 
 
@@ -467,6 +496,15 @@ function tagmap(cls, tbl)
     local r = {}
     for k, v in pairs(tbl) do
         r[get_tag_id(cls, k)] = v
+    end
+    return r
+end
+function union(...)
+    local r = {}
+    for _, s in ipairs({...}) do
+        for k, _ in pairs(s) do
+            r[k]=true
+        end
     end
     return r
 end
