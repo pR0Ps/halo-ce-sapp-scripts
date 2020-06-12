@@ -4,7 +4,8 @@ Gun Game: Players must work their way through the game's arsenal. First to the e
 
 NOTES:
  - Only works with the FFA slayer game type (all other modes will cause the map to skip)
- - Should be played with a normal weapon set so all weapons are available.
+ - Should be played on a map/weapon set that has all of the configured weapons available.
+ - Levels will be skipped if the configured weapon can't found or given to a player.
 
 LICENCE: GNU GPL3
 ]]--
@@ -15,65 +16,65 @@ local CONFIG = {
     levels = {
         --[[
         {
-            weapon = <weapon name (see DATA.weapon_names)>
+            weapon = <weapon tag>
             [ammo = {<loaded>, <unloaded>}/<battery>]
             [kills = <number of kills needed to progress>]
             [skip=true (players will skip the level)]
         }
         ]]
         {
-            weapon = "pistol",
+            weapon = "weapons\\pistol\\pistol",
             -- max: 12, 120
             ammo = { 12, 120 }
         },
         {
-            weapon = "plasma cannon",
+            weapon = "weapons\\plasma_cannon\\plasma_cannon",
             -- max: 100 (battery)
             ammo = 100,
         },
         {
-            weapon = "shotgun",
+            weapon = "weapons\\shotgun\\shotgun",
             -- max: 12, 60
             ammo = { 12, 60 }
         },
         {
-            weapon = "rocket launcher",
+            weapon = "weapons\\rocket launcher\\rocket launcher",
             -- max: 2, 8
             ammo = { 2, 8 }
         },
         {
-            weapon = "sniper rifle",
+            weapon = "weapons\\sniper rifle\\sniper rifle",
             -- max: 4, 24
             ammo = { 4, 24 }
         },
         {
-            weapon = "flamethrower",
+            weapon = "weapons\\flamethrower\\flamethrower",
             -- max: 100, 600
             ammo = { 100, 600 },
         },
         {
-            weapon = "needler",
+            weapon = "weapons\\needler\\mp_needler",
             -- max: 20, 80
             ammo = { 20, 80 }
         },
         {
-            weapon = "plasma rifle",
+            weapon = "weapons\\plasma rifle\\plasma rifle",
             -- max: 100 (battery)
             ammo = 100
         },
         {
-            weapon = "plasma pistol",
+            weapon = "weapons\\plasma pistol\\plasma pistol",
             -- max: 100 (battery)
             ammo = 100
         },
         {
-            weapon = "assault rifle",
+            weapon = "weapons\\assault rifle\\assault rifle",
             -- max: 60, 600
             ammo = { 60, 600 }
         },
         {
             -- Make them more visible and melee-only
-            weapon = "flag",
+            weapon = "weapons\\flag\\flag",
             kills = 1
         },
     },
@@ -87,94 +88,66 @@ api_version = "1.11.0.0"
 local player_data = {}
 
 -- Generates reference data when the game starts
--- Need to run on game start so the tag addresses are valid
+-- Need to run on game start so the tags are pulled from the current map
 local DATA = nil
 function GenerateReferenceData()
+    -- Get tags for every weapon available in the map
+    local weapon_tag_data = get_weapon_tag_data()
+
+    -- Process the data into usable sets/lists
+    local damage_map = {}
+    local melee_tag_ids = {}
+    local weapon_tag_paths = {}
+    local weapon_tag_ids = {}
+
+    for _, weapon in ipairs(weapon_tag_data) do
+        local weapon_tag_type = weapon[1]
+        local weapon_tag_path = weapon[2]
+        local damage_tag_paths = weapon[3]
+        local weapon_tag_id = get_tag_id(weapon_tag_type, weapon_tag_path)
+
+        weapon_tag_ids[weapon_tag_id] = true
+        weapon_tag_paths[#weapon_tag_paths+1] = weapon_tag_path
+
+        -- Uncomment this if you want a list of weapon tags the current map
+        -- supports to be printed to the console
+        --cprint(string.format(" - %s: %s", weapon_tag_type, weapon_tag_path))
+
+        for _, dmg_tag_path in ipairs(damage_tag_paths) do
+            local dmg_tag = lookup_tag("jpt!", dmg_tag_path)
+            local dmg_tag_data = read_dword(dmg_tag + 0x14)
+            local dmg_tag_id = read_dword(dmg_tag + 0xC)
+            -- Damage.Category enum
+            local is_melee = read_word(dmg_tag_data + 0x1C6) == 6
+
+            if is_melee then
+                melee_tag_ids[dmg_tag_id] = true
+            else
+                if damage_map[dmg_tag_id] == nil then
+                    damage_map[dmg_tag_id] = {}
+                end
+                damage_map[dmg_tag_id][weapon_tag_path] = true
+            end
+        end
+    end
+
     DATA = {
-        -- Weapons names used when defining levels are defined here
-        -- All these tags will be disabled from the map
-        weapon_names = {
-            ["assault rifle"] = "weapons\\assault rifle\\assault rifle",
-            ["ball"] = "weapons\\ball\\ball",
-            ["flag"] = "weapons\\flag\\flag",
-            ["flamethrower"] = "weapons\\flamethrower\\flamethrower",
-            ["frag grenade"] = "weapons\\frag grenade\\frag grenade",
-            ["needler"] = "weapons\\needler\\mp_needler",
-            ["pistol"] = "weapons\\pistol\\pistol",
-            ["plasma cannon"] = "weapons\\plasma_cannon\\plasma_cannon",
-            ["plasma grenade"] = "weapons\\plasma grenade\\plasma grenade",
-            ["plasma pistol"] = "weapons\\plasma pistol\\plasma pistol",
-            ["plasma rifle"] = "weapons\\plasma rifle\\plasma rifle",
-            ["rocket launcher"] = "weapons\\rocket launcher\\rocket launcher",
-            ["shotgun"] = "weapons\\shotgun\\shotgun",
-            ["sniper rifle"] = "weapons\\sniper rifle\\sniper rifle",
-        },
+        -- A list of weapon tags
+        -- Used to disable picking up weapons
+        weapon_tag_paths = weapon_tag_paths,
 
-        -- Map damage tags to the weapons that cause them
-        damage_map = tagmap("jpt!", {
-            ["weapons\\assault rifle\\bullet"] = "assault rifle",
-            ["weapons\\flamethrower\\burning"] = "flamethrower",
-            ["weapons\\flamethrower\\explosion"] = "flamethrower",
-            ["weapons\\flamethrower\\impact damage"] = "flamethrower",
-            --["weapons\\frag grenade\\explosion"] = "frag grenade",
-            --["weapons\\frag grenade\\shock wave"] = "frag grenade",
-            ["weapons\\needler\\detonation damage"] = "needler",
-            ["weapons\\needler\\explosion"] = "needler",
-            ["weapons\\needler\\impact damage"] = "needler",
-            ["weapons\\needler\\shock wave"] = "needler",
-            ["weapons\\pistol\\bullet"] = "pistol",
-            --["weapons\\plasma grenade\\attached"] = "plasma grenade",
-            --["weapons\\plasma grenade\\explosion"] = "plasma grenade",
-            --["weapons\\plasma grenade\\shock wave"] = "plasma grenade",
-            ["weapons\\plasma pistol\\bolt"] = "plasma pistol",
-            ["weapons\\plasma rifle\\bolt"] = "plasma rifle",
-            ["weapons\\plasma rifle\\charged bolt"] = "plasma pistol", --sic
-            ["weapons\\plasma_cannon\\effects\\plasma_cannon_explosion"] = "plasma cannon",
-            ["weapons\\plasma_cannon\\impact damage"] = "plasma cannon",
-            ["weapons\\rocket launcher\\explosion"] = "rocket launcher",
-            ["weapons\\shotgun\\pellet"] = "shotgun",
-            ["weapons\\sniper rifle\\sniper bullet"] = "sniper rifle",
-        }),
+        -- A set of weapon tag ids
+        -- Used to the spawning of weapons
+        weapon_tag_ids = weapon_tag_ids,
 
-        -- Weapon tags (spawning these will be blocked)
-        weapon_tags = union(
-            tagset("weap", {
-                "weapons\\assault rifle\\assault rifle",
-                "weapons\\ball\\ball",
-                "weapons\\flag\\flag",
-                "weapons\\flamethrower\\flamethrower",
-                "weapons\\needler\\mp_needler",
-                "weapons\\pistol\\pistol",
-                "weapons\\plasma_cannon\\plasma_cannon",
-                "weapons\\plasma pistol\\plasma pistol",
-                "weapons\\plasma rifle\\plasma rifle",
-                "weapons\\rocket launcher\\rocket launcher",
-                "weapons\\shotgun\\shotgun",
-                "weapons\\sniper rifle\\sniper rifle",
-            }),
-            tagset("eqip", {
-                "weapons\\frag grenade\\frag grenade",
-                "weapons\\plasma grenade\\plasma grenade",
-            })
-        ),
+        -- A set of damage tag ids that are considered melee damage
+        melee_tag_ids = melee_tag_ids,
 
-        -- These damage tags are considered melee damage
-        melee_tags = tagset("jpt!", {
-            "weapons\\assault rifle\\melee",
-            "weapons\\ball\\melee",
-            "weapons\\flag\\melee",
-            "weapons\\flamethrower\\melee",
-            "weapons\\needler\\melee",
-            "weapons\\pistol\\melee",
-            "weapons\\plasma pistol\\melee",
-            "weapons\\plasma rifle\\melee",
-            "weapons\\plasma_cannon\\effects\\plasma_cannon_melee",
-            "weapons\\rocket launcher\\melee",
-            "weapons\\shotgun\\melee",
-            "weapons\\sniper rifle\\melee",
-        }),
+        -- Maps damage tag ids to a list of weapon(s) that cause them
+        -- Used for verifying playes use the correct weapons
+        damage_map = damage_map,
 
-        -- Map damage tag to multipliers
+        -- Map damage tags to damage multipliers
         damage_multipliers = tagmap("jpt!", {
             -- 1 hit KO for ball and flag
             ["weapons\\ball\\melee"] = 4,
@@ -221,7 +194,7 @@ function OnGameStart()
 
     -- Disable vehicles, weapons, and grenades
     execute_command("disable_all_vehicles 0 1")
-    for _, tag in pairs(DATA.weapon_names) do
+    for tag, _ in pairs(DATA.weapon_tag_paths) do
         execute_command("disable_object '" .. tag .. "'")
     end
 
@@ -240,7 +213,7 @@ end
 
 function OnObjectSpawn(player_index, tag_id, parent_id, new_obj_id, sapp_spawned)
     -- block weapons spawned by the server (unless it was from a script)
-    if sapp_spawned == 0 and player_index == 0 and DATA.weapon_tags[tag_id] ~= nil then
+    if sapp_spawned == 0 and player_index == 0 and DATA.weapon_tag_ids[tag_id] ~= nil then
         return false
     end
 end
@@ -248,7 +221,7 @@ end
 function OnGameEnd()
     -- Re-enable everything we disabled
     execute_command("disable_all_vehicles 0 0")
-    for _, tag in pairs(DATA.weapon_names) do
+    for tag, _ in pairs(DATA.weapon_tag_paths) do
         execute_command("enable_object '" .. tag .. "'")
     end
 
@@ -290,8 +263,8 @@ end
 -- Attempt to assign the correct weapon to the player
 -- Returns false if the player could not accept the weapon
 function assign_weapon_for_level(player_index, level)
-    local weapon_name = CONFIG.levels[level].weapon
-    local weapon_obj = spawn_object("weap", DATA.weapon_names[weapon_name])
+    local weapon_tag = CONFIG.levels[level].weapon
+    local weapon_obj = spawn_object("weap", weapon_tag)
 
     -- Try to assign the weapon
     if assign_weapon(weapon_obj, player_index) then
@@ -448,17 +421,17 @@ function OnPlayerDie(player_index, killer_index)
 
     -- Check the type of damage that killed the player
     local last_dmg = player_data[player_index].last_dmg_tag
-    if DATA.melee_tags[last_dmg] ~= nil then
+    if DATA.melee_tag_ids[last_dmg] ~= nil then
         -- Melee kill - victim level down
         change_level(player_index, -1)
         add_kill(killer_index)
     else
         -- Verify the correct weapon was used
         -- The prevents multi-kills from skipping levels
-        local weapon_used = DATA.damage_map[last_dmg]
-        if weapon_used == nil then
-            cprint("WARNING: Unknown weapon caused damage - script needs updating", 4)
-        elseif CONFIG.levels[player_data[killer_index].level].weapon == weapon_used then
+        local possible_weapons_used = DATA.damage_map[last_dmg]
+        if possible_weapons_used == nil then
+            cprint("WARNING: Unknown weapon caused damage - script needs fixing", 4)
+        elseif possible_weapons_used[CONFIG.levels[player_data[killer_index].level].weapon] ~= nil then
             -- Note the kill for the killer
             add_kill(killer_index)
         end
@@ -476,34 +449,145 @@ function OnWeaponDrop(player_index)
 end
 
 
--- Get the id of a tag given it's class and name
-function get_tag_id(tagclass, tagname)
-    local tag = lookup_tag(tagclass, tagname)
-    if tag == nil then return nil end
+-- Decode an integer to an ascii string
+function decode_ascii(value)
+    local r, i = {}, 1
+    while value > 0 do
+        r[i] = string.char(value%256)
+        i = i + 1
+        value = math.floor(value/256)
+    end
+    return string.reverse(table.concat(r))
+end
+
+
+-- Reads the tag type and path from an address
+function resolve_reference(address)
+    local type = decode_ascii(read_dword(address))
+    local path_address = read_dword(address + 0x4)
+    if path_address == 0 then
+        return type, nil
+    end
+    return type, read_string(path_address)
+end
+
+
+-- Return any damage effects the provided tag can cause by recursively
+-- exploring referenced tags and returning any "jpt!" tags
+-- Only damage tags that have a non-zero damage attribute will be returned
+function get_damage_tags(type, path)
+    local r = {}
+
+    if type == nil or path == nil then return r end
+
+    local tag = lookup_tag(type, path)
+    if tag == 0 then return r end
+
+    local tag_data = read_dword(tag + 0x14)
+
+    --helper function for recursion into referenced tags
+    local recurse_tag = function(address)
+        local t, p = resolve_reference(address)
+        for _, v in ipairs(get_damage_tags(t, p)) do
+            table.insert(r, v)
+        end
+    end
+
+    if type == "weap" then
+        -- Player Melee Damage
+        recurse_tag(tag_data + 0x394)
+
+        -- Trigger actions (a struct of size 0x114)
+        local trigger_count = read_dword(tag_data + 0x4FC)
+        local trigger_base = read_dword(tag_data + 0x4FC + 0x4)
+        for i=0, trigger_count - 1 do
+            recurse_tag(trigger_base + i * 0x114 + 0x94)
+        end
+    elseif type == "eqip" then
+        -- These are just grenades in the stock maps
+        -- Creation Effect
+        recurse_tag(tag_data + 0xA0)
+        -- Item.Detonating Effect
+        recurse_tag(tag_data + 0x2E8)
+        -- Item.Detonation Effect
+        recurse_tag(tag_data + 0x2F8)
+    elseif type == "proj" then
+        -- Projectile.Super Detonation
+        recurse_tag(tag_data + 0x18C)
+        -- Detonation.Effect
+        recurse_tag(tag_data + 0x1AC)
+        -- Physics.Detonation Started
+        recurse_tag(tag_data + 0x1F4)
+        -- Physics.Attached Detonation Damage
+        recurse_tag(tag_data + 0x214)
+        -- Physics.Impact Damage
+        recurse_tag(tag_data + 0x224)
+        -- Miscellaneous.Detonation Effect
+        recurse_tag(tag_data + 0x68)
+    elseif type == "effe" then
+        -- Events (a struct of size 0x44)
+        local event_count = read_dword(tag_data + 0x34)
+        local event_base = read_dword(tag_data + 0x34 + 0x4)
+        for i=0, event_count - 1 do
+            local event = event_base + i * 0x44
+
+            -- Event parts (a struct of size 0x68)
+            local part_count = read_dword(event + 0x2C)
+            local part_base = read_dword(event + 0x2C + 0x4)
+            for j=0, part_count - 1 do
+                -- Event part type
+                recurse_tag(part_base + j * 0x68 + 0x18)
+            end
+        end
+    elseif type == "jpt!" then
+        -- Only return damage tags that can actually do damage
+        local lethal_to_unsuspecting = read_word(tag_data + 0x1C4) == 2
+        local max_damage = read_float(tag_data + 0x1D8)
+        if lethal_to_unsuspecting or max_damage > 0 then
+            r[#r+1] = path
+        end
+    end
+    return r
+end
+
+
+-- Pull out all weapons and eqipment whos tag starts with "weapons\" 
+-- For each tag return a list of:
+-- {<tag type>, <tag path>, {<damage effect(s) this can cause>}}
+function get_weapon_tag_data()
+    local r = {}
+    local map_base = 0x40440000
+    local tag_base = read_dword(map_base)
+    local tag_count = read_dword(map_base + 0xC)
+
+    for i=0, tag_count - 1 do
+        local tag = tag_base + i * 0x20
+        local tag_type = decode_ascii(read_dword(tag))
+        local tag_path = read_string(read_dword(tag + 0x10))
+        if (tag_type == "weap" or tag_type == "eqip") and string.find(tag_path, '^weapons\\') ~= nil then
+            r[#r+1] = {tag_type, tag_path, get_damage_tags(tag_type, tag_path)}
+        end
+    end
+    return r
+end
+
+
+-- Get the id of a tag given its type and path
+function get_tag_id(tag_type, tag_path)
+    local tag = lookup_tag(tag_type, tag_path)
+    if tag == 0 then return nil end
     return read_dword(tag + 0xC)
 end
 
 
--- Utility functions for making maps/sets of tag ids for easy lookups
-function tagset(cls, tbl)
-    local r = {}
-    for _, d in ipairs(tbl) do
-        r[get_tag_id(cls, d)] = true
-    end
-    return r
-end
-function tagmap(cls, tbl)
+-- Convert tag path keys of a table to tag ids
+-- Drops invalid tags
+function tagmap(type, tbl)
     local r = {}
     for k, v in pairs(tbl) do
-        r[get_tag_id(cls, k)] = v
-    end
-    return r
-end
-function union(...)
-    local r = {}
-    for _, s in ipairs({...}) do
-        for k, _ in pairs(s) do
-            r[k]=true
+        local id = get_tag_id(type, k)
+        if id ~= nil then
+            r[id] = v
         end
     end
     return r
