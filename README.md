@@ -7,7 +7,7 @@ Scripts for customizing a Halo CE dedicated server running SAPP.
 Addresses and offsets
 ---------------------
  - https://pastebin.com/Sm2Pf7V5
- - https://pastebin.com/z4eqrjVN
+ - https://pastebin.com/QUWTMuKg (original: https://pastebin.com/z4eqrjVN )
 
 
 Links
