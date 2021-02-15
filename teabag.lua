@@ -140,13 +140,14 @@ end
 function remove_bodies(fcn)
     local player_index = 1
     while player_index <= num_bodies do
-        -- Overwrite the current element with the last-place element and decrement the length
         if fcn(bodies[player_index]) then
+            -- Remove the element by overwriting it with the last element decrementing the length
             bodies[player_index] = bodies[num_bodies]
             bodies[num_bodies] = nil
             num_bodies = num_bodies - 1
+        else
+            player_index = player_index + 1
         end
-        player_index = player_index + 1
     end
 end
 
@@ -343,7 +344,7 @@ function OnPlayerDie(player_index, killer_index)
     local body_ptr = find_body_ptr(player)
     if body_ptr == nil then return end
 
-    -- Need to store the player id so when we dereferencing the body pointer we
+    -- Need to store the player id so when we dereference the body pointer we
     -- can check if it still points at the correct data
     local player_id = read_dword(player + 0xC0)
 
