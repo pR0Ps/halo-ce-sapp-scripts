@@ -449,6 +449,29 @@ function OnWeaponDrop(player_index)
 end
 
 
+--Convenience function for iterating over an array of data
+function iter_array(base, count, size)
+    local i = -1
+    return function()
+        i = i + 1
+        if i <= count - 1 then return base + i * size end
+    end
+end
+
+
+--Convenience function for iterating over an array pointer.
+--Assumes a dword containing the number of elements followed by
+--a dword pointer to the start of the data.
+function iter_array_ptr(base, size)
+    local count = read_dword(base)
+    local start = read_dword(base + 0x4)
+    local iter = iter_array(start, count, size)
+    return function()
+        return iter()
+    end
+end
+
+
 -- Decode an integer to an ascii string
 function decode_ascii(value)
     local r, i = {}, 1
@@ -497,11 +520,9 @@ function get_damage_tags(type, path)
         -- Player Melee Damage
         recurse_tag(tag_data + 0x394)
 
-        -- Trigger actions (a struct of size 0x114)
-        local trigger_count = read_dword(tag_data + 0x4FC)
-        local trigger_base = read_dword(tag_data + 0x4FC + 0x4)
-        for i=0, trigger_count - 1 do
-            recurse_tag(trigger_base + i * 0x114 + 0x94)
+        -- Trigger actions (structs of size 0x114)
+        for trigger in iter_array_ptr(tag_data + 0x4FC, 0x114) do
+            recurse_tag(trigger + 0x94)
         end
     elseif type == "eqip" then
         -- These are just grenades in the stock maps
@@ -525,18 +546,12 @@ function get_damage_tags(type, path)
         -- Miscellaneous.Detonation Effect
         recurse_tag(tag_data + 0x68)
     elseif type == "effe" then
-        -- Events (a struct of size 0x44)
-        local event_count = read_dword(tag_data + 0x34)
-        local event_base = read_dword(tag_data + 0x34 + 0x4)
-        for i=0, event_count - 1 do
-            local event = event_base + i * 0x44
-
-            -- Event parts (a struct of size 0x68)
-            local part_count = read_dword(event + 0x2C)
-            local part_base = read_dword(event + 0x2C + 0x4)
-            for j=0, part_count - 1 do
+        -- Events (structs of size 0x44)
+        for event in iter_array_ptr(tag_data + 0x34, 0x44) do
+            -- Event parts (structs of size 0x68)
+            for part in iter_array_ptr(event + 0x2C, 0x68) do
                 -- Event part type
-                recurse_tag(part_base + j * 0x68 + 0x18)
+                recurse_tag(part + 0x18)
             end
         end
     elseif type == "jpt!" then
@@ -560,8 +575,7 @@ function get_weapon_tag_data()
     local tag_base = read_dword(map_base)
     local tag_count = read_dword(map_base + 0xC)
 
-    for i=0, tag_count - 1 do
-        local tag = tag_base + i * 0x20
+    for tag in iter_array(tag_base, tag_count, 0x20) do
         local tag_type = decode_ascii(read_dword(tag))
         local tag_path = read_string(read_dword(tag + 0x10))
         if (tag_type == "weap" or tag_type == "eqip") and string.find(tag_path, '^weapons\\') ~= nil then
