@@ -109,10 +109,6 @@ function GenerateReferenceData()
         weapon_tag_ids[weapon_tag_id] = true
         weapon_tag_paths[#weapon_tag_paths+1] = weapon_tag_path
 
-        -- Uncomment this if you want a list of weapon tags the current map
-        -- supports to be printed to the console
-        --cprint(string.format(" - %s: %s", weapon_tag_type, weapon_tag_path))
-
         for _, dmg_tag_path in ipairs(damage_tag_paths) do
             local dmg_tag = lookup_tag("jpt!", dmg_tag_path)
             local dmg_tag_data = read_dword(dmg_tag + 0x14)
@@ -512,7 +508,7 @@ function get_damage_tags(type, path)
     local recurse_tag = function(address)
         local t, p = resolve_reference(address)
         for _, v in ipairs(get_damage_tags(t, p)) do
-            table.insert(r, v)
+            r[#r+1] = v
         end
     end
 
@@ -582,6 +578,18 @@ function get_weapon_tag_data()
             r[#r+1] = {tag_type, tag_path, get_damage_tags(tag_type, tag_path)}
         end
     end
+
+    -- Uncomment the below code if you want a list of weapon tags and the damage
+    -- tags they apply to be printed to the console
+    --[[
+    cprint("Weapons and the damage tags they inflict for the current map:")
+    for _, weapon in ipairs(r) do
+        cprint(string.format(" - %s: %s", weapon[1], weapon[2]))
+        for _, dmg_tag_path in ipairs(weapon[3]) do
+            cprint(string.format("   - %s", dmg_tag_path))
+        end
+    end --]]
+
     return r
 end
 
