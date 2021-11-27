@@ -31,6 +31,14 @@ local CONFIG = {
         announce = "Skip voting enabled - type 'skip' to vote"
     },
     {
+        modes = {"one in the chamber", "oitc"},
+        scripts = "oneinthechamber",
+        announce = {
+            "Game mode: One in the Chamber",
+            "You have 1 bullet. Killing an enemy gives you another."
+        }
+    },
+    {
         modes = "Gun Game",
         maps = nil,
         scripts = "gungame",
