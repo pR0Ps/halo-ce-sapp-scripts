@@ -31,6 +31,11 @@ local CONFIG = {
         announce = "Skip voting enabled - type 'skip' to vote"
     },
     {
+        modes = {"fiesta", "team fiesta"},
+        scripts = "fiesta",
+        announce = "Starting weapons are randomized!"
+    },
+    {
         modes = {"one in the chamber", "oitc"},
         scripts = "oneinthechamber",
         announce = {
